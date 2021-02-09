@@ -11,138 +11,145 @@
  *      the effects of throwing a 1. The player's turn finishes with play passing to the next
  *      player.
  *
- *   TASK:
- *     Create a program to track score and simulate dice throws in a two-player game.
+ *   SEE:
+ *     https://rosettacode.org/wiki/Pig_the_dice_game
  */
 
-// TODO Need full reformatting of all information / outputs to make human-readable.
-// TODO Use of loops are confusing. Entire thing is rough sketch -- how to clean?
+/*
+ *   TASK:
+ *     Create a program to track score and simulate dice throws in a two-player game.
+*/
+
 use rand::prelude::*;
 
 fn main() {
     println!("Beginning game of Pig...");
-    let player1: Player = Player::new("PLAYER ONE (1)");
-    let player2: Player = Player::new("PLAYER TWO (2)");
 
-    let mut stage: Vec<Player> = vec![player1, player2];
+    Stage::new(
+        Player::new(String::from("PLAYER (1) ONE")),
+        Player::new(String::from("PLAYER (2) TWO")),
+    )
+    .perform();
 
-    loop {
-        for player in stage.iter_mut() {
-            if player.score <= 100 || player.status != Status::End {
-                println!("{} has {:?} Score", player.name, player.score);
-                player._resolve();
-            } else {
-                println!("{} wins!", player.name);
-                break;
-            }
-        }
-    }
+    println!("Thanks for playing!");
 }
 
 type DiceRoll = u32;
+type Score = u32;
+type Name = String;
 
-trait Dice {
-    fn rng(&self) -> rand::rngs::ThreadRng;
-    fn roll(&self) -> DiceRoll;
-}
-
-#[derive(Copy, Clone, Debug)]
 enum Action {
     Roll,
     Hold,
 }
 
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-enum Status {
+#[derive(PartialEq)]
+enum TurnStatus {
     Continue,
     End,
 }
 
-type Score = u32;
-type Name<'name> = &'name str;
-
-#[derive(Copy, Clone, Debug, PartialOrd, PartialEq)]
-struct Player<'name> {
-    name: Name<'name>,
+struct Player {
+    name: Name,
     score: Score,
-    status: Status,
+    status: TurnStatus,
 }
 
-impl<'name> Player<'_> {
+impl Player {
     fn new(name: Name) -> Player {
         Player {
             name,
             score: 0,
-            status: Status::Continue,
+            status: TurnStatus::Continue,
         }
     }
 
-    fn _input(&self) -> String {
-        let mut cmd: String = String::new();
-        std::io::stdin()
-            .read_line(&mut cmd)
-            .expect("could not read input");
-        cmd.trim().parse().expect("could not configure input")
+    fn roll() -> DiceRoll {
+        // Simple 1d6 dice.
+        let sides = rand::distributions::Uniform::new(1, 6);
+        rand::thread_rng().sample(sides)
     }
 
-    fn _action(&self) -> Action {
-        // TODO Redo all of this fn() to make it cleaner.
-        let input = self._input();
-        let input = input
-            .as_str()
-            .to_lowercase()
-            .chars()
-            .next()
-            .expect("could not retrieve first letter!");
+    fn action() -> Action {
+        // Closure to determine userinput as action.
+        let command = || -> char {
+            let mut cmd: String = String::new();
+            match std::io::stdin().read_line(&mut cmd) {
+                Ok(c) => c.to_string(),
+                Err(err) => panic!("Error: {}", err),
+            };
 
-        match input {
+            cmd.to_lowercase()
+                .chars()
+                .next()
+                .expect("could not retrieve first letter!")
+        };
+
+        match command() {
             'r' => Action::Roll,
             'h' => Action::Hold,
             _ => panic!("not a valid command!"),
         }
     }
 
-    fn _turn(&mut self) -> Score {
+    fn turn(&mut self) -> Score {
         let mut score: Score = 0;
-        loop {
-            println!("[R]oll / [H]old");
-            match self._action() {
-                Action::Roll => match self.roll() {
+        'player: loop {
+            println!("# {}'s Turn", self.name);
+            println!("######  [R]oll   ######\n######  --OR--   ######\n######  [H]old   ######");
+            match Player::action() {
+                Action::Roll => match Player::roll() {
                     0 | 7..=u32::MAX => panic!("outside dice bounds!"),
-                    1 => {
-                        println!("Dice result is (1)! Dumping score and ending turn...");
-                        self.status = Status::End;
-                        // TODO This is causing _resolve() to set score to 0?
-                        break 0;
+                    die @ 1 => {
+                        println!("[DICE] Dice result is: {:3}!", die);
+                        println!("[DUMP] Dumping Score! Sorry!");
+                        println!("###### ENDING TURN ######");
+                        self.status = TurnStatus::End;
+                        break 'player 0;
                     }
                     die @ 2..=6 => {
-                        println!("Dice result is ({})!", die);
-                        println!("Active Score is: [{}]!", (score + die));
-                        println!("Held Score would be: [{}]\n", (score + die + self.score));
-                        self.status = Status::Continue;
+                        println!("[DICE] Dice result is: {:3}!", die);
+                        println!("[ROLL] Total    Score: {:3}!", (score + die));
+                        println!("[HOLD] Possible Score: {:3}!", (score + die + self.score));
+                        self.status = TurnStatus::Continue;
                         score += die
                     }
                 },
                 Action::Hold => {
-                    self.status = Status::End;
-                    break score;
+                    self.status = TurnStatus::End;
+                    break 'player score;
                 }
             }
         }
     }
 
-    fn _resolve(&mut self) {
-        self.score += self._turn()
+    fn resolve(&mut self) {
+        self.score += self.turn()
     }
 }
 
-impl Dice for Player<'_> {
-    fn rng(&self) -> rand::rngs::ThreadRng {
-        rand::thread_rng()
+struct Stage {
+    players: Vec<Player>,
+}
+
+impl Stage {
+    fn new(player_a: Player, player_b: Player) -> Stage {
+        Stage {
+            players: vec![player_a, player_b],
+        }
     }
 
-    fn roll(&self) -> DiceRoll {
-        let sides = rand::distributions::Uniform::new(1, 6);
-        self.rng().sample(sides)
+    fn perform(&mut self) {
+        'game: loop {
+            for player in &mut self.players {
+                if player.score <= 100 || player.status == TurnStatus::Continue {
+                    println!("\n# {} has {:?} Score", player.name, player.score);
+                    player.resolve();
+                } else {
+                    println!("\n{} wins!", player.name);
+                    break 'game;
+                }
+            }
+        }
     }
 }
