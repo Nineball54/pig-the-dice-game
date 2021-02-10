@@ -1,25 +1,3 @@
-/* Pig the dice game
- * The game of Pig is a multiplayer game played with a single 6-sided die. The object of the game
- * is to reach 100 points or more. Play is taken in turns. On each person's turn that person has
- * the option of either:
- *   1. Rolling the dice: where a roll of two to six is added to their score for that turn and the
- *      player's turn continues as the player is given the same choice again; or a roll of 1 loses
- *      the player's total points for that turn and their turn finishes with play passing to the
- *      next player.
- *
- *   2. Holding: The player's score for that round is added to their total and becomes safe from
- *      the effects of throwing a 1. The player's turn finishes with play passing to the next
- *      player.
- *
- *   SEE:
- *     https://rosettacode.org/wiki/Pig_the_dice_game
- */
-
-/*
- *   TASK:
- *     Create a program to track score and simulate dice throws in a two-player game.
-*/
-
 use rand::prelude::*;
 
 fn main() {
@@ -97,7 +75,7 @@ impl Player {
             match command() {
                 Some('r') => break 'user_in Action::Roll,
                 Some('h') => break 'user_in Action::Hold,
-                Some(invalid) => println!("{} is not a valid command!", invalid),
+                Some(inv) => println!("{} is not a valid command!", inv),
                 None => println!("Please input a command!"),
             }
         }
