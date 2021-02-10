@@ -93,6 +93,18 @@ impl Player {
     }
 
     fn turn(&mut self) -> Score {
+        let one = |die: DiceRoll| {
+            println!("[DICE] Dice result is: {:3}!", die);
+            println!("[DUMP] Dumping Score! Sorry!");
+            println!("###### ENDING TURN ######");
+        };
+
+        let two_to_six = |die: DiceRoll, score: Score, player_score: Score| {
+            println!("[DICE] Dice result is: {:3}!", die);
+            println!("[ROLL] Total    Score: {:3}!", (score + die));
+            println!("[HOLD] Possible Score: {:3}!", (score + die + player_score));
+        };
+
         let mut score: Score = 0;
         'player: loop {
             println!("# {}'s Turn", self.name);
@@ -101,16 +113,12 @@ impl Player {
                 Action::Roll => match Player::roll() {
                     0 | 7..=u32::MAX => panic!("outside dice bounds!"),
                     die @ 1 => {
-                        println!("[DICE] Dice result is: {:3}!", die);
-                        println!("[DUMP] Dumping Score! Sorry!");
-                        println!("###### ENDING TURN ######");
+                        one(die);
                         self.status = TurnStatus::End;
                         break 'player 0;
                     }
                     die @ 2..=6 => {
-                        println!("[DICE] Dice result is: {:3}!", die);
-                        println!("[ROLL] Total    Score: {:3}!", (score + die));
-                        println!("[HOLD] Possible Score: {:3}!", (score + die + self.score));
+                        two_to_six(die, score, self.score);
                         self.status = TurnStatus::Continue;
                         score += die
                     }
