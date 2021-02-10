@@ -25,11 +25,22 @@ use rand::prelude::*;
 fn main() {
     println!("Beginning game of Pig...");
 
-    Stage::new(
+    let mut players = vec![
         Player::new(String::from("PLAYER (1) ONE")),
         Player::new(String::from("PLAYER (2) TWO")),
-    )
-    .perform();
+    ];
+
+    'game: loop {
+        for player in players.iter_mut() {
+            if player.cont() {
+                println!("\n# {} has {:?} Score", player.name, player.score);
+                player.resolve();
+            } else {
+                println!("\n{} wins!", player.name);
+                break 'game;
+            }
+        }
+    }
 
     println!("Thanks for playing!");
 }
@@ -72,45 +83,54 @@ impl Player {
 
     fn action() -> Action {
         // Closure to determine userinput as action.
-        let command = || -> char {
+        let command = || -> Option<char> {
             let mut cmd: String = String::new();
             match std::io::stdin().read_line(&mut cmd) {
                 Ok(c) => c.to_string(),
                 Err(err) => panic!("Error: {}", err),
             };
 
-            cmd.to_lowercase()
-                .chars()
-                .next()
-                .expect("could not retrieve first letter!")
+            cmd.to_lowercase().trim().chars().next()
         };
 
-        match command() {
-            'r' => Action::Roll,
-            'h' => Action::Hold,
-            _ => panic!("not a valid command!"),
+        'user_in: loop {
+            match command() {
+                Some('r') => break 'user_in Action::Roll,
+                Some('h') => break 'user_in Action::Hold,
+                Some(invalid) => println!("{} is not a valid command!", invalid),
+                None => println!("Please input a command!"),
+            }
         }
     }
 
     fn turn(&mut self) -> Score {
+        let one = |die: DiceRoll| {
+            println!("[DICE] Dice result is: {:3}!", die);
+            println!("[DUMP] Dumping Score! Sorry!");
+            println!("###### ENDING TURN ######");
+        };
+
+        let two_to_six = |die: DiceRoll, score: Score, player_score: Score| {
+            println!("[DICE] Dice result is: {:3}!", die);
+            println!("[ROLL] Total    Score: {:3}!", (score + die));
+            println!("[HOLD] Possible Score: {:3}!", (score + die + player_score));
+        };
+
         let mut score: Score = 0;
         'player: loop {
             println!("# {}'s Turn", self.name);
             println!("######  [R]oll   ######\n######  --OR--   ######\n######  [H]old   ######");
+
             match Player::action() {
                 Action::Roll => match Player::roll() {
                     0 | 7..=u32::MAX => panic!("outside dice bounds!"),
                     die @ 1 => {
-                        println!("[DICE] Dice result is: {:3}!", die);
-                        println!("[DUMP] Dumping Score! Sorry!");
-                        println!("###### ENDING TURN ######");
+                        one(die);
                         self.status = TurnStatus::End;
                         break 'player 0;
                     }
                     die @ 2..=6 => {
-                        println!("[DICE] Dice result is: {:3}!", die);
-                        println!("[ROLL] Total    Score: {:3}!", (score + die));
-                        println!("[HOLD] Possible Score: {:3}!", (score + die + self.score));
+                        two_to_six(die, score, self.score);
                         self.status = TurnStatus::Continue;
                         score += die
                     }
@@ -126,30 +146,8 @@ impl Player {
     fn resolve(&mut self) {
         self.score += self.turn()
     }
-}
 
-struct Stage {
-    players: Vec<Player>,
-}
-
-impl Stage {
-    fn new(player_a: Player, player_b: Player) -> Stage {
-        Stage {
-            players: vec![player_a, player_b],
-        }
-    }
-
-    fn perform(&mut self) {
-        'game: loop {
-            for player in &mut self.players {
-                if player.score <= 100 || player.status == TurnStatus::Continue {
-                    println!("\n# {} has {:?} Score", player.name, player.score);
-                    player.resolve();
-                } else {
-                    println!("\n{} wins!", player.name);
-                    break 'game;
-                }
-            }
-        }
+    fn cont(&self) -> bool {
+        self.score <= 100 || self.status == TurnStatus::Continue
     }
 }
